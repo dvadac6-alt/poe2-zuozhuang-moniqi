@@ -1,9 +1,9 @@
 /* 做装模拟器 Service Worker —— 静态资源缓存优先 + 后台更新（stale-while-revalidate）
  * 二次访问秒开、可离线使用；部署新版后下次访问自动换新。
  * 数据包结构变更时请递增 CACHE 版本号强制全量刷新。 */
-const CACHE = "poe2-craft-v3";
+const CACHE = "poe2-craft-v4";
 const CORE = [
-  "index.html", "style.css",
+  "index.html", "style.css", "manifest.webmanifest", "icon-192.png", "icon-512.png",
   "data.js", "data_pools.js", "augments.js", "assets.js",
   "i18n_mods.js", "engine.js", "stats.js", "app.js",
 ];
