@@ -2253,6 +2253,9 @@ function openLiquidModal() {
     s.src = "data_pools.js";
     s.onload = () => {
       E.loadPools(window.POE2_POOLS);
+      // 词缀池并入全局数据对象：openEssenceModal/editPool 等处直接读 D.essenceModMap 的遗留引用需要
+      Object.assign(window.POE2_DATA, window.POE2_POOLS);
+      Object.assign(window.POE2_DATA.aldur, window.POE2_POOLS.aldur || {});
       if (S.item && document.getElementById("screen-craft").classList.contains("active")) renderCraft(false);
       flushPoolWaiters();
     };

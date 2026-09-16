@@ -703,19 +703,29 @@
     const entry = essenceIndex.get(poolKeyOf(item) + "|" + o.essence + "|" + o.tier);
     if (!entry) return { ok: false, reason: "该精华不适用于此部位/基底" };
     const mod = modsById.get(entry.modId);
-    // 规则（0.5 / POE2_HTC）：一件物品最多同时携带 1 条精华词缀（普通+完美合并计数，互斥）；
-    // 其次才按词缀家族互斥（同族/同 id 不可叠加）。
-    if (item.affixes.some((a) => a.source === "essence"))
-      return { ok: false, reason: "物品已携带一条精华词缀，无法再使用精华（上限 1 条）" };
-    if (item.affixes.some((a) => modOf(a).family === mod.family || a.modId === mod.id))
+    /* 规则（0.5 实测 / Maxroll）：普通~高级精华一件限 1 条；完美精华为替换语义 ——
+     * 物品已有精华词缀时仍可用，先移除那条精华词缀再添加新保底（「精华王朝」反复刷法，
+     * B站 BV1FyanzdETj：满词缀下完美精华「先移除再添加」，无需左右旋晶化预兆腾位）。 */
+    const essenceAffix = item.affixes.find((a) => a.source === "essence");
+    if (essenceAffix && o.tier !== "PERFECT")
+      return { ok: false, reason: "物品已携带一条精华词缀，无法再使用精华（完美精华可替换）" };
+    if (item.affixes.some((a) => a !== essenceAffix && (modOf(a).family === mod.family || a.modId === mod.id)))
       return { ok: false, reason: "已存在同族词缀，无法使用该精华" };
     const it = clone(item);
     const events = [];
     const omen = o.omen ? omenById.get(o.omen) : null;
     if (item.rarity === "rare") {
-      // 完美精华：替换同类型词缀（预兆可限定前/后缀），保持 3前3后上限
+      // 完美精华替换：已有精华词缀且与保底同位 → 换它（精华王朝反复刷法）；
+      // 无精华词缀 → 按类型移除随机一条（预兆可限定前/后缀），保持 3前3后上限。
+      // 注意从克隆后的 it 里取引用（applyRemove 按 indexOf 移除）。
       const wantType = omen && omen.constrainTo ? omen.constrainTo : mod.type;
-      const target = removeAffix(it, (a) => modOf(a).type === wantType && !a.fractured, rng);
+      const essInIt = it.affixes.find((a) => a.source === "essence" && !a.fractured);
+      let target;
+      if (essInIt) {
+        if (modOf(essInIt).type !== wantType)
+          return { ok: false, reason: "已有精华词缀在" + (modOf(essInIt).type === "prefix" ? "前缀" : "后缀") + "位，完美精华保底为" + (wantType === "prefix" ? "前缀" : "后缀") + "位，需同位替换" };
+        target = essInIt;
+      } else target = removeAffix(it, (a) => modOf(a).type === wantType && !a.fractured, rng);
       if (!target) return { ok: false, reason: "没有可替换的" + (wantType === "prefix" ? "前缀" : "后缀") };
       applyRemove(it, target);
       events.push({ type: "remove", affix: target });
