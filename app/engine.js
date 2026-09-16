@@ -355,8 +355,8 @@
     return out;
   }
   function eligiblePairs(item, opts) {
-    const o = Object.assign({ source: "normal", type: null, floor: 0, boss: null, asRarity: null }, opts);
-    const types = freeTypes(item, o.type, o.asRarity);
+    const o = Object.assign({ source: "normal", type: null, floor: 0, boss: null, asRarity: null, types: null }, opts);
+    const types = o.types || freeTypes(item, o.type, o.asRarity);
     if (!types.length) return [];
     const takenIds = new Set(item.affixes.map((a) => a.modId));
     const takenFam = new Set(item.affixes.map((a) => modOf(a).family));
@@ -829,6 +829,8 @@
     if (tier.maxIlvl && item.ilvl > tier.maxIlvl)
       return { ok: false, reason: boneNameFor(item.classId, o.boneTier) + "只能用于物品等级 ≤ " + tier.maxIlvl + " 的物品" };
     // 两步流程第一步：添加骨头 phantom 槽（等待揭示），记录档位供揭示使用
+    if (item.affixes.some((a) => a.hidden))
+      return { ok: false, reason: "已携带一条渎灵词缀（每件限 1 条），可用剥离/光之预兆移除后再用" };
     if (!item.bonePhantom) {
       const it = clone(item);
       it.bonePhantom = { pending: true, tier: o.boneTier || "preserved", omens: omens.slice() };
@@ -976,7 +978,11 @@
     const tier = BONE_TIER[o.boneTier || (item.bonePhantom && item.bonePhantom.tier) || "preserved"] || BONE_TIER.preserved;
     const floor = Math.max(o.floor || 0, tier.floor || 0);
     const maxIlvl = tier.maxIlvl || null;
-    const pairs = eligiblePairs(item, { source: "desecrated", asRarity: "rare", type: eff.constrainTo, floor, maxIlvl, boss: o.boss || eff.boss });
+    // 每件限 1 条渎灵词缀；两侧全满时进入替换模式（两侧候选都出，揭示时同侧随机顶替一条）
+    if (item.affixes.some((a) => a.source === "desecrated")) return [];
+    let types = freeTypes(item, eff.constrainTo, "rare");
+    if (!types.length) types = eff.constrainTo ? [eff.constrainTo] : ["prefix", "suffix"];
+    const pairs = eligiblePairs(item, { source: "desecrated", asRarity: "rare", types, floor, maxIlvl, boss: o.boss || eff.boss });
     // 每个 mod 只保留一个（最高权重档）
     const byMod = new Map();
     for (const p of pairs) {
@@ -997,10 +1003,23 @@
     return out;
   }
   function applyDesecrate(item, pair, rng) {
+    // 渎灵词缀占常规前后缀位（poe2wiki），每件限 1 条；满词缀时同侧先随机移除一条再放入（替换语义）
+    if (item.affixes.some((x) => x.source === "desecrated"))
+      return { ok: false, reason: "已携带一条渎灵词缀（每件限 1 条）" };
     const it = clone(item);
-    it.affixes.push(makeAffix(pair, rng, "desecrated"));
+    const want = pair.mod.type;
+    const cnt = affixCounts(it);
+    const cap = capsFor(it, it.rarity);
+    let removed = null;
+    if ((want === "prefix" ? cnt.prefix : cnt.suffix) >= (want === "prefix" ? cap.prefix : cap.suffix)) {
+      removed = removeAffix(it, (a) => modOf(a).type === want && !a.fractured, rng);
+      if (!removed) return { ok: false, reason: "没有可替换的" + (want === "prefix" ? "前缀" : "后缀") };
+      applyRemove(it, removed);
+    }
+    const a = makeAffix(pair, rng, "desecrated");
+    it.affixes.push(a);
     delete it.bonePhantom; // 揭示完成，消耗骨头槽
-    return it;
+    return it; // 兼容：直接返回物品（替换详情可从前后词缀差分获得）
   }
 
   const ENGINE = {

@@ -388,7 +388,7 @@
     const curName = cur === "desecrated" ? E.boneNameFor(S.item.classId, S.boneTier || "preserved") : m.zh;
     const omenBadge = omens.map((oid) => `<span class="exp" style="color:#d4c4f4;border-color:rgba(157,127,212,.5)">${OMEN_ZH[oid][0]}</span>`).join("");
     const usedBadge = usageCountOf(cur) ? `<span class="used-n">×${usageCountOf(cur)}</span>` : "";
-    const descTxt = reason || (cur === "desecrated" ? `渎灵稀有物品 +1 隐藏词缀（${{ gnawed: "仅 ilvl≤64 低档池", preserved: "无限制", ancient: "词缀等级 ≥40" }[S.boneTier || "preserved"]}）` : m.desc);
+    const descTxt = reason || (cur === "desecrated" ? `渎灵揭示一条词缀（占用前后缀位；满词缀时同侧随机顶替一条；每件限 1 条。${{ gnawed: "仅 ilvl≤64 低档池", preserved: "无限制", ancient: "词缀等级 ≥40" }[S.boneTier || "preserved"]}）` : m.desc);
     return `
     <button class="cur-btn ${sel}" data-cur="${cur}" ${ok2 ? "" : "disabled"} title="${esc(reason || (S.selCur === cur ? "已选中 —— 点「使用通货」生效（再点一下取消选中）" : "点选后按「使用通货」生效"))}">
       ${curIcon(cur, 40)}
@@ -959,6 +959,7 @@
   }
   function useDesecrate(pair, omens, boneTier) {
     const rItem = E.applyDesecrate(S.item, pair, E.defaultRng);
+    if (rItem && rItem.ok === false) { toast(rItem.reason, "warn"); $("#desecrate-modal").classList.add("hidden"); return; }
     const tierMeta = E.BONE_TIER[boneTier] || E.BONE_TIER.preserved;
     const boneName = E.boneNameFor(S.item.classId, boneTier);
     const cost = (D.prices.desecrate || 0) * tierMeta.priceMult + omens.reduce((s, oid) => s + (D.omenPrices[oid] || 0), 0);
